@@ -1,0 +1,429 @@
+NICOLAS PAES � 1312093
+RODRIGO PUMAR ALVES DE SOUZA � 1221007
+QUESTAO: 1a) Fa�a um programa composto por dois processos, processo pai e processo filho,
+onde:
+ o Pai - Imprime o seu pid, espera o filho terminar e imprime "Pai finalizado".
+ o Filho - Imprime o seu pid e o pid do seu pai, e no final imprime "Filho finalizado".
+
+DICA: Procure na internet o comando para obter o PID (process id) de um processo. 
+-----------------------------------------------------
+ex1a.c
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+int main(void) {
+	int status;
+	int pidPai = getpid();
+
+	if (fork() != 0) { // Codigo Pai
+		printf("Processo pai:\n");
+		printf("meu pid: %d\n", pidPai);
+		waitpid(-1, &status, 0);
+		printf("Pai finalizado\n");
+	}
+	else { // Codigo Filho
+		printf("	Processo filho\n");
+		printf("	pid: %d\n", getpid()); //print este pid
+		printf("	pid pai: %d\n", getppid()); //print pid pai
+		printf("	Filho finalizado\n");
+		exit(0);
+	}
+
+    return 0;
+}
+-----------------------------------------------------
+COMPILA��O E EXECU��O
+$ gcc -o ex1a ex1a.c
+$ ./ex1a
+-----------------------------------------------------
+RESULTADO
+Processo pai:
+meu pid: 2199
+	Processo filho
+	pid: 2200
+	pid pai: 2199
+	Filho finalizado
+Pai finalizado
+-----------------------------------------------------
+CONCLUS�O
+O ""fork()" passa executar um programa com codigo indentico como um processo filho. 
+A unica diferenca entre os processos pai e filho sao que seu PID, e o retorno do "retorno=fork()", sendo 0 o retorno para o filho e o pid do filho para o pai.
+Usando esse retorno diferente, fazemos uma condicao que nos permite fazer cada processo executar linhas de comandos diferentes.
+Usando o codigo "waitpid(-1, &status, 0);" fazemos o programa esperar terminar os processos filhos antes de continuar execucao.
+-----------------------------------------------------
+
+
+QUEST�O 1b) Crie processos pai e filho, e 
+� Crie uma vari�vel vis�vel ao pai e ao filho iniciada com 0. 
+� O pai deve somar 50 a esta vari�vel e imprimir: Pai <PID> - <valor>. 
+� O filho deve somar 10 a esta vari�vel e imprimir: Filho <PID> - <valor>. 
+� O pai deve esperar o processo filho terminar e imprimir novamente o valor da vari�vel: Pai ap�s <PID> - <valor>. 
+O que voc� observou sobre o valor da vari�vel no pai e no filho? Explique o por qu� deste comportamento.   
+-----------------------------------------------------
+ex1b.c
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+int main(void) {
+	int var = 0;
+	int status;
+
+	if (fork() != 0) { // Codigo Pai
+		var += 50;
+		printf("Pai %d - %d -end %p \n", getpid(), var, &var);
+
+		waitpid(-1, &status, 0);
+		printf("Pai %d - %d -end %p \n", getpid(), var, &var);
+	}
+	else { // Codigo Filho
+		var += 10;
+		printf("	Filho %d - %d - end %p \n", getpid(), var, &var);
+	}
+	return 0;
+}
+-----------------------------------------------------
+COMPILA��O E EXECU��O
+$ gcc -o exercicio exercicio1.c
+$ ./exercicio
+-----------------------------------------------------
+RESULTADO
+Pai 2251 - 50 -end 0x7fffd166c5e0 
+	Filho 2252 - 10 - end 0x7fffd166c5e0 
+Pai 2251 - 50 -end 0x7fffd166c5e0 
+
+-----------------------------------------------------
+CONCLUS�O
+Texto com no m�nimo 1 par�grafo respondendo � quest�o e explicando o funcionamento do c�digo feito.
+-----------------------------------------------------
+
+
+QUEST�O 2) Fa�a um programa em que tr�s processos q executam paralelamente as seguintes a��es: 
+� Pai - Imprime os n�meros de 1 a 50, com um intervalo de 2 segundos entre cada n�mero. 
+Ap�s imprimir todos os n�meros, imprime a frase �Processo pai vai morrer�. 
+� Filho1 - Imprime os n�meros de 100 a 200, com um intervalo de 1 segundo entre cada n�mero. 
+Antes de imprimir os n�meros, imprime a frase �Filho 1 foi criado�, e ap�s imprimir todos os n�meros, 
+imprime a frase �Filho 1 vai morrer�. � Neto1- (filho do processo Filho1) imprime os n�meros de 300 a 350, 
+com um intervalo de 2 segundos entre cada n�mero. Antes de imprimir os n�meros, 
+imprime a frase �Neto 1 foi criado� Ap�s imprimir todos os n�meros, imprime a frase �Neto 1 vai morrer�. 
+ 
+Importante:     
+? Em cada printf os processos devem imprimir o seu pid e o pid do seu pai.     
+? DICA: sleep(1) bloqueia o processo por 1 segundo. 
+ 
+� poss�vel ver os processos executando em paralelo? 
+Que altera��es devem ser feitas em seu programa para que primeiro sejam exibidos s� os prints do neto, 
+depois s� os do filho e depois s� os do pai? 
+-----------------------------------------------------
+ex2.C
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+int main(void) {
+	int var = 0;
+	int status;
+
+	if (fork() != 0) { // Codigo Pai
+		for (int i=1;i<=50;i++)
+		{
+			var=i;
+			printf("var: %d \n", var);
+			sleep(2);
+		}
+		printf("Processo Pai vai morrer  		pidPai: %d  meuPid: %d \n",getppid() , getpid());
+
+	}
+	else if (fork()!=0)
+	{ // Codigo Filho
+		printf(" 	Filho 1 foi Criado pidPai: %d  meuPid: %d \n",getppid() , getpid());
+		for (int i=100;i<=200;i++)
+		{
+			var=i;
+			printf("	var: %d \n", var);
+			sleep(1);
+		}
+		printf(" 	Filho 1 vai morrer 	pidPai: %d  meuPid: %d \n",getppid() , getpid());
+
+	}else { // Codigo Neto
+		printf(" 		Neto 1 foi criado pidPai: %d  meuPid: %d \n",getppid() , getpid());
+		for (int i=300;i<=350;i++)
+		{
+			var=i;
+			printf("		var: %d \n", var);
+			sleep(2);
+		}
+		printf("  		Neto 1 vai morrer 		pidPai: %d  meuPid: %d \n",getppid() , getpid());
+	}
+	return 0;
+}
+-----------------------------------------------------
+COMPILA��O E EXECU��O
+$ gcc -o ex2 ex2.c
+$ ./ex2
+-----------------------------------------------------
+RESULTADO
+var: 1 
+ 	Filho 1 foi Criado pidPai: 1880  meuPid: 1881 
+	var: 100 
+ 		Neto 1 foi criado pidPai: 1881  meuPid: 1882 
+		var: 300 
+	var: 101 
+var: 2 
+		var: 301 
+	var: 102 
+	var: 103 
+var: 3 
+		var: 302 
+	var: 104 
+	var: 105 
+var: 4 
+		var: 303 
+	var: 106 
+	var: 107 
+var: 5 
+		var: 304 
+	var: 108 
+	var: 109 
+var: 6 
+		var: 305 
+	var: 110 
+	var: 111 
+var: 7 
+		var: 306 
+	var: 112 
+	var: 113 
+var: 8 
+		var: 307 
+	var: 114 
+	var: 115 
+var: 9 
+		var: 308 
+	var: 116 
+	var: 117 
+var: 10 
+		var: 309 
+	var: 118 
+	var: 119 
+var: 11 
+		var: 310 
+	var: 120 
+	var: 121 
+var: 12 
+		var: 311 
+	var: 122 
+	var: 123 
+var: 13 
+		var: 312 
+	var: 124 
+	var: 125 
+var: 14 
+		var: 313 
+	var: 126 
+	var: 127 
+var: 15 
+		var: 314 
+	var: 128 
+	var: 129 
+var: 16 
+		var: 315 
+	var: 130 
+	var: 131 
+var: 17 
+		var: 316 
+	var: 132 
+	var: 133 
+var: 18 
+		var: 317 
+	var: 134 
+	var: 135 
+var: 19 
+		var: 318 
+	var: 136 
+	var: 137 
+var: 20 
+		var: 319 
+	var: 138 
+	var: 139 
+var: 21 
+		var: 320 
+	var: 140 
+	var: 141 
+var: 22 
+		var: 321 
+	var: 142 
+	var: 143 
+var: 23 
+		var: 322 
+	var: 144 
+	var: 145 
+var: 24 
+		var: 323 
+	var: 146 
+	var: 147 
+var: 25 
+		var: 324 
+	var: 148 
+	var: 149 
+var: 26 
+		var: 325 
+	var: 150 
+	var: 151 
+var: 27 
+		var: 326 
+	var: 152 
+	var: 153 
+var: 28 
+		var: 327 
+	var: 154 
+	var: 155 
+var: 29 
+		var: 328 
+	var: 156 
+	var: 157 
+var: 30 
+		var: 329 
+	var: 158 
+	var: 159 
+var: 31 
+		var: 330 
+	var: 160 
+	var: 161 
+var: 32 
+		var: 331 
+	var: 162 
+	var: 163 
+var: 33 
+		var: 332 
+	var: 164 
+	var: 165 
+var: 34 
+		var: 333 
+	var: 166 
+	var: 167 
+var: 35 
+		var: 334 
+	var: 168 
+	var: 169 
+var: 36 
+		var: 335 
+	var: 170 
+	var: 171 
+var: 37 
+		var: 336 
+	var: 172 
+	var: 173 
+var: 38 
+		var: 337 
+	var: 174 
+	var: 175 
+var: 39 
+		var: 338 
+	var: 176 
+	var: 177 
+var: 40 
+		var: 339 
+	var: 178 
+	var: 179 
+var: 41 
+		var: 340 
+	var: 180 
+	var: 181 
+var: 42 
+		var: 341 
+	var: 182 
+	var: 183 
+var: 43 
+		var: 342 
+	var: 184 
+	var: 185 
+var: 44 
+		var: 343 
+	var: 186 
+	var: 187 
+var: 45 
+		var: 344 
+	var: 188 
+	var: 189 
+var: 46 
+		var: 345 
+	var: 190 
+	var: 191 
+var: 47 
+		var: 346 
+	var: 192 
+	var: 193 
+var: 48 
+		var: 347 
+	var: 194 
+	var: 195 
+var: 49 
+		var: 348 
+	var: 196 
+	var: 197 
+var: 50 
+		var: 349 
+	var: 198 
+	var: 199 
+Processo Pai vai morrer  		pidPai: 1859  meuPid: 1880 
+ 		var: 350 
+	var: 200 
+ 	Filho 1 vai morrer 	pidPai: 935  meuPid: 1881 
+  		Neto 1 vai morrer 		pidPai: 935  meuPid: 1882 
+
+
+-----------------------------------------------------
+CONCLUS�O
+Sim, eh possivel ver tanto o pai, neto e filho executando em paralelo pois o output intercala entre os print de cada um. 
+Para que se execute apenas o neto, depois filho depois pai, precisa-se acrescentar "waitpid(-1, &status, 0);" depois de cada fork.
+-----------------------------------------------------
+
+
+QUESTAO: 3) Crie um programa que realize o print da frase: "Alô mundo", no arquivo alomundo.c. 
+Compile este programa. Em seguida, crie um programa que execute o programa alomundo criado por você. 
+ 
+Importante:     ◦ Utilize alguma função da família "execv" para realizar esta atividade.     
+◦ Para conhecer os protótipos das funções disponíveis execute o comando man no Terminal para acessar o manual: "man execv"
+-----------------------------------------------------
+ex3.c
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+
+int main(void) {
+	int status;
+	char* const parameters[] = {NULL};
+	printf("pidPai: %d  meuPid: %d \n",getppid() , getpid());
+	execv("alomundo", parameters);
+	printf("pidPai: %d  meuPid: %d \n",getppid() , getpid());
+    return 0;
+}
+-----------------------------------------------------
+alomundo.c
+#include <stdio.h>
+
+int main(void) {
+	printf("Alô mundo\n");
+    return 0;
+}
+-----------------------------------------------------
+COMPILA��O E EXECU��O
+$ gcc -o alomundo alomundo.c
+$ gcc -o ex3 ex3.c
+$ ./ex3
+-----------------------------------------------------
+RESULTADO
+pidPai: 3237  meuPid: 3295
+Alô mundo
+-----------------------------------------------------
+CONCLUS�O
+Quando o comando execv é executado, o processo é substituído pelo novo programa,
+indicado pelo primeiro argumento, assim se executa o alomundo, imprimindo "alo mundo". 
+Porem o processo original nao retorna apos o termindo de alomundo, por isso nao foi executado o segundo printf que colocamos para demonstrar isso.
+
+
+

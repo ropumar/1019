@@ -1,0 +1,8 @@
+Processo pai:
+meu pid: 2199
+	Processo filho
+	pid: 2200
+	pid pai: 2199
+	Filho finalizado
+Pai finalizado
+
