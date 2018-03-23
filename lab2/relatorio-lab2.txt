@@ -1,0 +1,351 @@
+﻿NICOLAS PAES - 1312093
+RODRIGO PUMAR ALVES DE SOUZA - 1221007
+
+LABORATORIO 2
+
+QUESTAO: 1a)Faça um programa para somar matrizes de acordo
+com o seguinte algoritmo
+l O primeiro processo irá criar duas matrizes
+preenchidas e uma terceira vazia em 3 áreas de
+memória compartilhada.
+l Para cada linha da matriz solução, o seu
+programa deverá gerar um processo para o seu
+cálculo.
+OBS: implemente as matrizes como vetores de tamanho
+(linha x coluna) e aloque a shared memory para os vetores
+correspondentes, pois acessar os elementos (i,j) é complexo. 
+-----------------------------------------------------
+ex1.c
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+void preenche_m1(int *m,int nlinhas, int ncolunas) {
+	int i,j;
+	for (i=0; i < nlinhas; i++) {
+		for (j=0; j < ncolunas; j++) {
+			m[i*ncolunas+j] = 2*i+3*j;
+		}
+	}
+}
+void preenche_m2(int *m,int nlinhas, int ncolunas) {
+	int i,j;
+	for (i=0; i < nlinhas; i++) {
+		for (j=0; j < ncolunas; j++) {
+			m[i*ncolunas+j] = 3*i+2*j;;
+		}
+	}
+}
+
+void imprime_m(int *m,int nlinhas, int ncolunas) {
+	int i,j;
+	for (i=0; i < nlinhas; i++) {
+		for (j=0; j < ncolunas; j++) {
+			printf("%d ",m[i*ncolunas+j]);
+		}
+		printf("\n");
+	}
+}
+
+int main() {
+	int i, j;
+	int nlinha = 3;
+	int ncol =4;
+	int seg1, seg2, seg3;
+	int *m1, *m2, *m3;
+	int nforks;
+	int pid;
+	int status;
+	seg1 = shmget (IPC_PRIVATE, sizeof (int)*nlinha*ncol, IPC_CREAT | IPC_EXCL | S_IRUSR | S_IWUSR); 
+	if (seg1 == -1) {
+		puts ("Erro na criação de segmento de memoria compartilhada.");
+		exit(1);
+	}
+	m1 = (int *) shmat (seg1, 0, 0);
+
+	seg2 = shmget (IPC_PRIVATE, sizeof (int)*nlinha*ncol, IPC_CREAT | IPC_EXCL | S_IRUSR | S_IWUSR); 
+	if (seg2 == -1) {
+		puts ("Erro na criação de segmento de memoria compartilhada.");
+		exit(1);
+	}
+	m2 = (int *) shmat (seg2, 0, 0);
+
+	seg3 = shmget (IPC_PRIVATE, sizeof (int)*nlinha*ncol, IPC_CREAT | IPC_EXCL | S_IRUSR | S_IWUSR); 
+	if (seg3 == -1) {
+		puts ("Erro na criação de segmento de memoria compartilhada.");
+		exit(1);
+	}
+	m3 = (int *) shmat (seg3, 0, 0);
+	
+	preenche_m1(m1,nlinha, ncol);
+	preenche_m2(m2,nlinha, ncol);
+	printf("M1: ");
+	imprime_m(m1,nlinha,ncol);
+	printf("M2: ");
+	imprime_m(m2,nlinha,ncol);
+
+
+	for (nforks = 0; nforks < nlinha; nforks++) {
+		pid = fork();
+		if (pid < 0) { 
+			puts ("Erro na criação do novo processo"); 
+			exit (-2); 
+		} 
+		if (pid == 0) {
+			printf ("    Processo filho \n");
+			int j, indice = nforks*ncol;
+			for (j = 0; j < ncol; j++) {
+				m3[indice] = m1[indice] + m2[indice];
+				indice++;
+			}
+			break;
+		}
+	}
+	if (pid != 0) {
+		printf ("Processo Pai \n");
+		for(i=0;i<nforks;i++){
+			waitpid(-1,&status,0);
+		}
+		printf("Terceira matriz\n");
+		imprime_m(m3,nlinha,ncol);
+	}
+
+	shmdt (m1); 
+	shmctl (seg1, IPC_RMID, 0); 
+	shmdt (m2); 
+	shmctl (seg2, IPC_RMID, 0); 
+	shmdt (m3); 
+	shmctl (seg3, IPC_RMID, 0);
+
+	return 0;
+}
+
+-----------------------------------------------------
+COMPILA��O E EXECU��O
+$ gcc -o ex1 ex1.c
+$ ./ex1
+-----------------------------------------------------
+RESULTADO
+M1: 0 3 6 9 
+2 5 8 11 
+4 7 10 13 
+M2: 0 2 4 6 
+3 5 7 9 
+6 8 10 12 
+    Processo filho 
+M1: 0 3 6 9 
+2 5 8 11 
+4 7 10 13 
+M2: 0 2 4 6 
+3 5 7 9 
+6 8 10 12 
+    Processo filho 
+M1: 0 3 6 9 
+2 5 8 11 
+4 7 10 13 
+M2: 0 2 4 6 
+3 5 7 9 
+6 8 10 12 
+    Processo filho 
+M1: 0 3 6 9 
+2 5 8 11 
+4 7 10 13 
+M2: 0 2 4 6 
+3 5 7 9 
+6 8 10 12 
+Processo Pai 
+Terceira matriz
+0 5 10 15 
+5 10 15 20 
+10 15 20 25 
+-----------------------------------------------------
+CONCLUS�O
+Como todos os processos compartilham memoria, podemos separar os calculos de um vetor em diferentes processos e 
+todos os processos terao os todos os valores calculados. 
+Como mostrado ao calcular um vetor em 3 processos filhos e imprimir no processo pai todo o vetor.
+
+-----------------------------------------------------
+
+
+QUEST�O 2)Faça um programa que: l  Leia uma mensagem do dia do stdin (ou arquivo)
+ Crie uma memória compartilhada com a chave 8752 l  Salve a mensagem na memória 
+ Faça um outro programa “cliente” que utilize a mesma chave (8752) e exiba a mensagem do dia para o usuário  
+-----------------------------------------------------
+ex2.c
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <sys/wait.h>
+#include <string.h>
+
+int main() {
+
+	int seg=0; 
+	int tam_string=141;
+	char msg[tam_string],*mensagem_dia;
+	int pid;
+	char* const parameters[] = {NULL};
+	int tamanho = sizeof(char)*tam_string;
+
+	printf("Insira mensagem do dia\n");
+	scanf(" %140[^\n]",msg);
+
+	seg = shmget (8752, tamanho, IPC_CREAT | IPC_EXCL | S_IRUSR | S_IWUSR); 
+
+	if (seg == -1) {
+		puts ("Erro na criação de segmento de memoria compartilhada.");
+		exit(1);
+	}
+	mensagem_dia = (char *) shmat (seg, 0, 0);
+	strcpy(mensagem_dia,msg);
+	shmdt (mensagem_dia); 
+	execv("ex2b", parameters); 
+	return 0;
+}
+
+-----------------------------------------------------
+exb.c
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/shm.h>
+#include <sys/stat.h>
+
+
+int main () {
+
+	int seg=0; 
+	char *mensagem_dia;
+	int tam_string=141;
+	int tamanho = sizeof(char)*tam_string;
+	seg = shmget (8752, tamanho, S_IRUSR |  S_IWUSR);
+	if (seg == -1) {
+		printf("Erro segmento\n");
+		exit(1);
+	}
+	mensagem_dia = (char *) shmat (seg, 0, 0);
+
+	printf("Mensagem do dia: %s\n",mensagem_dia);
+
+	shmdt (mensagem_dia); 
+	shmctl (seg, IPC_RMID, 0); 
+
+	return 0;	
+
+}
+-----------------------------------------------------
+COMPILA��O E EXECU��O
+$ gcc -o ex2 ex2.c
+$ digitei isso
+$ ./ex2
+-----------------------------------------------------
+RESULTADO
+Insira mensagem do dia
+digitei isso
+Mensagem do dia: digitei isso
+
+-----------------------------------------------------
+CONCLUS�O
+Podemos mandar mensagem entre programas por meio da memoria compartilhada.
+O programa ex2 pede ao usuario para digitar a mensagem guardando na memoria compartilhada com chave 8752. 
+Depois esse programa se Desanexar da memoria e chama por execv o programa ex2b.
+O programa ex2b usa a chave para ter acesso a mensagem e depois de mostrar na tela se Desanexar e depois libera a memoria.
+-----------------------------------------------------
+
+
+QUEST�O 3)  Busca paralela em vetor 
+Faça um programa paralelo para localizar uma chave em um vetor. 
+Crie uma memória compartilhada com dados numéricos inteiros e desordenados e a divida pelo número de processos 
+Cada processo deve procurar o dado na sua área de memória e informar a posição onde o dado foi localizado.
+-----------------------------------------------------
+ex3.C
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <sys/wait.h>
+#define TAMANHO 12
+
+int main(){
+    int status;
+    int valor_procurado=7;
+    int *vetor;
+    int pid;
+    int v[TAMANHO]= {3,5,1,9,10,7,8,6,4,0,11,2};
+	int seg1 = shmget (IPC_PRIVATE, sizeof (int)*TAMANHO, IPC_CREAT | IPC_EXCL | S_IRUSR | S_IWUSR); 
+	if (seg1 == -1) {
+		puts ("Erro na criação de segmento de memoria compartilhada.");
+		exit(1);
+	}
+	vetor = (int *) shmat (seg1, 0, 0);
+    printf("vetor:");
+    for (int i = 0; i < TAMANHO; i++) {
+		vetor[i] = v[i];
+        printf("%d ",vetor[i]);
+	}
+    printf("\n");
+    
+    for(int i=0; i<TAMANHO; i=i+3){
+        pid=fork();
+        if (pid==0){
+            printf("Filho : %d\n", getpid());
+            printf("Filho de %d a %d\n", i,i+3);
+            int found = 0;
+            for(int j = 0;j < 3;j++) {
+                if (vetor[i+j] == valor_procurado) {
+                    found = 1;
+                    printf("Filho %d Encontrou na posicao %d do vetor o valor procurado %d \n",getpid() ,i+j, vetor[i+j]);
+                }
+            }
+            if (found != 1)
+                printf("Não encontrou ocorrência do valor no filho %d \n", getpid());
+            exit(1);
+        }else{
+            printf("Pai : %d\n", getpid());
+            waitpid(-1,&status,0);
+        }
+    }
+    shmdt (vetor); 
+	shmctl (seg1, IPC_RMID, 0); 
+    return 0;
+}
+-----------------------------------------------------
+COMPILA��O E EXECU��O
+$ gcc -o ex3 ex3.c
+$ ./ex3
+-----------------------------------------------------
+RESULTADO
+vetor:3 5 1 9 10 7 8 6 4 0 11 2 
+Pai : 10798
+Filho : 10799
+Filho de 0 a 3
+Não encontrou ocorrência do valor no filho 10799 
+Pai : 10798
+Filho : 10800
+Filho de 3 a 6
+Filho 10800 Encontrou na posicao 5 do vetor o valor procurado 7 
+Pai : 10798
+Filho : 10801
+Filho de 6 a 9
+Não encontrou ocorrência do valor no filho 10801 
+Pai : 10798
+Filho : 10802
+Filho de 9 a 12
+Não encontrou ocorrência do valor no filho 10802 
+
+-----------------------------------------------------
+CONCLUS�O
+Podemos usar a memoria compartilhada para procurar um inteiro num vetor paralelamente,
+assim podemos dividir o custo computacional em processos diferentes.
+-----------------------------------------------------
