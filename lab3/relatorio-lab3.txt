@@ -1,0 +1,448 @@
+﻿NICOLAS PAES - 1312093
+RODRIGO PUMAR ALVES DE SOUZA - 1221007
+
+LABORATORIO 3
+SINAL
+
+QUESTAO: 1)Execute o programa “ctrl-c.c”.
+Digite Ctrl-C e Ctrl-\. Analise o resultado.
+Neste mesmo programa, remova os
+comandos signal( ) e repita o teste anterior
+observando os resultados.
+-----------------------------------------------------
+ctrl-c.c
+#include <stdio.h>
+#include <signal.h>
+#include <stdlib.h>
+ 
+#define EVER ;;
+
+void intHandler(int sinal);
+void quitHandler(int sinal);
+
+int main(void) {
+	void (*p)(int);// ponteiro para função que recebe int como parâmetro 
+	p = signal(SIGINT,intHandler);
+	printf("Endereco do manipulador anterior %p\n",p);
+	p = signal(SIGQUIT,quitHandler);
+	printf("Endereco do manipulador anterior %p\n",p); 
+	puts("Ctrl-C desabilitado. Use Ctrl-\\ para terminar");
+	for(EVER);
+}
+
+void intHandler(int sinal) 
+{ 
+	printf("Você pressionou Ctrl-C (%d) \n", sinal); 
+}
+
+void quitHandler(int sinal) 
+{ 
+	printf("Terminando o processo... %d\n", sinal);
+	exit(0); 
+} 
+-----------------------------------------------------
+COMPILA��O E EXECU��O
+$ gcc -o ctrl-c ctrl-c.c
+$ ./ctrl-c
+-----------------------------------------------------
+RESULTADO
+Endereco do manipulador anterior (nil)
+Endereco do manipulador anterior (nil)
+Ctrl-C desabilitado. Use Ctrl-\ para terminar
+^CVocê pressionou Ctrl-C (2) 
+^CVocê pressionou Ctrl-C (2) 
+^\Terminando o processo... 3
+-----------------------------------------------------
+CONCLUS�O
+O programa é um loop infinito, usado para mostrar a captura de sinais.
+Registramos intHandler e quitHandler como as funções de tratamento para os sinais SIGINT e SIGQUIT respectivamente. 
+intHandler é chamado com Ctrl-c que imprime "Você pressionou Ctrl-C" e quitHandler com Ctrl-\ que termina o processo. 
+Sem os comandos signal, ao apertarmos crtl-c termina o processo devido ao tratamento padrao do sinal.
+-----------------------------------------------------
+QUESTAO: 2)Tente fazer um programa para interceptar o
+sinal SIGKILL. Você conseguiu? Explique.
+-----------------------------------------------------
+ex2.c
+#include <stdio.h>
+#include <signal.h>
+#include <stdlib.h>
+
+void killHandler(int sinal)
+{
+	printf("cheguei aqui\n");
+}
+
+int main(void) {
+	void (*p)(int);// ponteiro para função que recebe int como parâmetro 
+	p = signal(SIGKILL, killHandler);
+	printf("inicio\n");
+	while(1);
+	printf("final\n");
+}
+-----------------------------------------------------
+COMPILA��O E EXECU��O
+$ gcc -o ex2 ex2.c
+$ ./ex2
+-----------------------------------------------------
+RESULTADO
+inicio
+Quit (core dumped)
+-----------------------------------------------------
+CONCLUS�O
+Não conseguimos interceptar o sinal KILL com nosso handler.
+Isso acontece porque o sinal KILL automaticamente termina o 
+progresso pelo padrão do UNIX para que seja possivel interroper qualquer processso.
+-----------------------------------------------------
+QUESTAO: 3)Execute e explique o funcionamento de
+filhocidio.c
+-----------------------------------------------------
+filhocidio.c
+#include <stdio.h>
+#include <signal.h>
+#include <stdlib.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+void childhandler(int sinal);
+
+int delay;
+int main(int argc, char *argv[]) 
+{ 
+	pid_t pid;
+	 
+	signal(SIGCHLD, childhandler);
+	 
+	if((pid = fork()) < 0) 
+	{ 
+		fprintf(stderr, "Erro ao criar filho\n");
+		 
+		exit(-1); 
+	} 
+	if(pid == 0) /*child */
+	{
+		execve(argv[2], &argv[2], NULL);
+	} 
+	else /*parent */
+	{ 
+		sscanf(argv[1],"%d", &delay); /*read delay from command line */
+		sleep(delay); 
+		printf("Program %s exceeded limit of %d seconds!\n", argv[2],delay); 
+		kill(pid, SIGKILL); 
+	} 
+	return 0; 
+}
+
+void childhandler(int sinal)/*Executed if child dies before parent */
+{ 
+	int status; 
+	pid_t pid = wait(&status); 
+	printf("Child %d terminated within %d seconds com estado %d.\n", pid, delay, status); 
+	exit(0); 
+} 
+-----------------------------------------------------
+sleep5.c
+#include <stdio.h>
+#include <unistd.h>
+
+int main(void) 
+{ 
+	fprintf(stdout,"indo dormir...\n");
+ 
+	sleep(5); 
+	fprintf(stdout,"Acordei!\n");
+	return 0; 
+}
+-----------------------------------------------------
+sleep15.c
+#include <stdio.h>
+#include <unistd.h>
+
+int main(void) 
+{ 
+	fprintf(stdout,"indo dormir...\n");
+ 
+	sleep(5); 
+	fprintf(stdout,"Acordei!\n");
+	return 0; 
+}
+-----------------------------------------------------
+COMPILA��O E EXECU��O
+$ gcc -o filhocidio filhocidio.c
+$ gcc -o sleep5 sleep5.c
+$ gcc -o sleep15 sleep15.c
+$ ./filhocidio 10 ./sleep5
+RESULTADO 1
+$ ./filhocidio 10 ./sleep15
+RESULTADO 2
+-----------------------------------------------------
+RESULTADO 1
+
+indo dormir...
+Acordei!
+Child 13079 terminated within 10 seconds com estado 0.
+-----------------------------------------------------
+RESULTADO 2
+indo dormir...
+Program ./sleep15 exceeded limit of 10 seconds!
+-----------------------------------------------------
+CONCLUS�O
+O programa principal cria um processo filho, que executara um programa que dorme por 5 (sleep5) ou 15 (sleep15)
+segundos antes de imprimir sua ultima mensagem (Acordei!) e terminar.
+Registramos a captura de SIGCHLD que ira chamar childhandler para tratar quando o processo filho for terminado.
+Enquanto isso, o processo pai espera por T tempo, dependendo do primeiro argumento passado na linha de comando. 
+Ao fazer T=10 e sleep5. O processo filho termina em tempo fazendo o sinal SIGCHLD ser tratado pelo childhandler.
+Ao fazer T=10 e sleep15. O processo filho não termina em 10 segundos e portanto o processo pai mata o filho.
+
+-----------------------------------------------------
+
+QUESTAO: 4)Faça um programa que crie 2 processos
+filho e alterne a execução dos filhos. Após
+10 trocas de contexto, o processo pai mata
+os processos filho.
+OBS: Os processos filho são formados por
+loops eternos.
+-----------------------------------------------------
+ex4.c
+#include <stdio.h>
+#include <signal.h>
+#include <stdlib.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+void childhandler(int sinal);
+#define EVER ;;
+
+int main(int argc, char *argv[]) 
+{ 
+	pid_t pid1, pid2;
+	int i, processo, ntrocas;
+	processo = 1;
+	if((pid1 = fork()) < 0) 
+	{ 
+		fprintf(stderr, "Erro ao criar filho\n");
+		 
+		exit(-1); 
+	} 
+	if(pid1 == 0) /*Filho 1 */
+	{
+		for (EVER){
+			printf("Filho 1 sendo executado\n");
+			sleep(1); //Sleep para facilitar a visualizacao
+		}
+	} 
+
+	if((pid2 = fork()) < 0) 
+	{ 
+		fprintf(stderr, "Erro ao criar filho\n");
+		 
+		exit(-1); 
+	} 
+	if(pid2 == 0) /*Filho 2 */
+	{
+		for (EVER){
+			printf("Filho 2 sendo executado\n");
+			sleep(1); //Sleep para facilitar a visualizacao
+		}
+	} 
+	kill(pid1, SIGSTOP); //para filhos
+	kill(pid2, SIGSTOP); //para filhos
+	for(i=0; i<10; i++){ // 10 loops para fazer a troca entre filhos
+		if(processo == 1){
+			kill(pid2, SIGSTOP);
+    		kill(pid1, SIGCONT);
+    		printf("Troca %d\n",i+1);
+    		processo = 2;
+		}
+		else if(processo == 2){
+			kill(pid1, SIGSTOP);
+    		kill(pid2, SIGCONT);
+    		printf("Troca %d\n",i+1);
+    		processo = 1;
+		}
+		sleep(1); 
+	}
+
+	//Processo pai mata os processos filhos
+	kill(pid1, SIGKILL); 
+	kill(pid2, SIGKILL); 
+	return 0; 
+}
+-----------------------------------------------------
+COMPILA��O E EXECU��O
+$ gcc -o ex4 ex4.c
+$ ./ex4
+-----------------------------------------------------
+RESULTADO
+Troca 1
+Filho 1 sendo executado
+Troca 2
+Filho 2 sendo executado
+Troca 3
+Filho 1 sendo executado
+Troca 4
+Filho 2 sendo executado
+Troca 5
+Filho 1 sendo executado
+Troca 6
+Filho 2 sendo executado
+Troca 7
+Filho 1 sendo executado
+Troca 8
+Filho 2 sendo executado
+Troca 9
+Filho 1 sendo executado
+Troca 10
+Filho 2 sendo executado
+-----------------------------------------------------
+CONCLUS�O
+O processo pai cria dois processos filhos e para os dois processos com kill(pid, SIGSTOP);.
+Depois fazemos 10 loops que alterna entre continuar cada um dos filhos parando o outro. 
+Usamos o kill(pid, SIGCONT) para retonar a execucao de um filho.
+Ao acabar o loop o processo pai envia um sinal SIGKILL para os processos filhos.
+
+-----------------------------------------------------
+
+QUESTAO: 5)Faça um programa que leia 2 números reais
+e imprima o resultado das 4 operações
+básicas sobre estes 2 números.
+ Verifique o que acontece se o 2º. número
+da entrada for 0 (zero)
+ Capture o sinal de erro de floating point
+(SIGFPE) e repita a experiência anterior
+-----------------------------------------------------
+ex5.c
+#include <stdio.h>
+#include <signal.h>
+#include <stdlib.h>
+
+void FPEhandler (int sinal);
+
+int main (void) {
+	int x,y;
+	signal(SIGFPE, FPEhandler);
+	printf("Digite o primeiro numero: ");
+	scanf("%d", &x);
+	printf("Digite o segundo numero: ");
+	scanf("%d", &y);
+	printf("Adição: %d + %d = %d \nSubtração: %d - %d = %d \nDivisão: %d/%d = %d \nMultiplicação: %d x %d = %d \n", x, y, x+y, x, y, x-y, x, y, x/y, x, y, x*y);
+	return 0;
+
+}
+
+void FPEhandler (int sinal) {
+
+	printf ("Erro de Floating point exception\n");
+	exit(0);
+}
+-----------------------------------------------------
+COMPILA��O E EXECU��O
+$ gcc -o ex5 ex5.c
+$ ./ex5
+-----------------------------------------------------
+RESULTADO SEM HANDLER
+Digite o primeiro numero: 2
+Digite o segundo numero: 0
+Floating point exception (core dumped)
+-----------------------------------------------------
+RESULTADO COM HANDLER
+Digite o primeiro numero: 2
+Digite o segundo numero: 0
+Erro de Floating point exception
+-----------------------------------------------------
+RESULTADO SEM ERRO
+Digite o primeiro numero: 2
+Digite o segundo numero: 5
+Adição: 2 + 5 = 7 
+Subtração: 2 - 5 = -3 
+Divisão: 2/5 = 0 
+Multiplicação: 2 x 5 = 10 
+-----------------------------------------------------
+CONCLUS�O
+Quando colocamos o segundo número como zero,acarreta em erro de divisao por zero, 
+chamando o erro default de Floating point exception (core dumped). 
+Ao registrar o handler para o sinal de erro de floating point (SIGFPE), 
+ao acontecer esse erro chamamos a funcao de tratamento desse erro.
+
+-----------------------------------------------------
+QUESTAO: 6) Faça um programa para monitorar e informar o
+preço de chamadas telefônicas. O programa
+deverá ser executado em background.
+ O início e o término de uma chamada são
+informados através dos sinais SIGUSR1 e
+SIGUSR2, respectivamente.
+ O custo da ligação é de 2 centavos por
+segundo, para ligações de até 1 minuto ou de 1
+centavo por segundo a partir do 2º. minuto, ou
+seja, uma ligação de 1m30s custa R$1,50.
+-----------------------------------------------------
+ex6.c
+#include <stdio.h>
+#include <signal.h>
+#include <unistd.h>
+#include <stdlib.h>
+
+int tempo = 0;
+int centavos = 0;
+
+void initHandler (int sinal);
+void quitHandler (int sinal);
+
+int main (void){
+	signal(SIGUSR1, initHandler);
+	signal(SIGUSR2, quitHandler);
+	printf("Pronto para Receber Ligacoes no processo\n");
+	printf("Para Iniciar Ligacao:\n");
+	printf("kill -s USR1 %d\n", getpid());
+	printf("Para Terminar Ligacao:\n");
+	printf("kill -s USR2 %d\n", getpid());
+	printf("digite\n");
+	pause();
+	return 0;
+}
+
+void initHandler (int sinal){
+
+	printf("Ligação iniciada.\n");
+	while (1){
+		sleep(1);
+		tempo++;
+		if(tempo <= 60) centavos = centavos + 2;
+		else centavos++;
+	}
+}
+
+void quitHandler (int sinal){
+	printf("Ligacao Terminada.\n");
+	printf("Tempo gasto: %d segundos\nPreco: R$%d,%02d\n", tempo, centavos/100, centavos%100 );
+	exit(0);
+}
+-----------------------------------------------------
+COMPILA��O E EXECU��O
+$ gcc -o ex6 ex6.c
+$ ./ex6 &
+$kill -s USR1 15491
+$kill -s USR2 15491
+-----------------------------------------------------
+RESULTADO
+Pronto para Receber Ligacoes no processo
+Para Iniciar Ligacao:
+kill -s USR1 15491
+Para Terminar Ligacao:
+kill -s USR2 15491
+digite
+kill -s USR1 15491
+Ligação iniciada.
+kill -s USR2 15491
+Ligacao Terminada.
+Tempo gasto: 5 segundos
+Preco: R$0,10
+-----------------------------------------------------
+CONCLUS�O
+O programa é iniciado fica esperando o inicio de uma ligação.
+A ligação é iniciada pelo sinal SIGUSR1 pelo comando "kill -s USR1 15491" (sendo 15491 o pid do processo).
+A Terminada é iniciada pelo sinal SIGUSR2 pelo comando "kill -s USR1 15491" (sendo 15491 o pid do processo).
+A função quitHandler diz a duração da chamada, o preço da mesma e termina o processo.
+
+
+
+
