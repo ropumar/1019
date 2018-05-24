@@ -1,0 +1,373 @@
+RODRIGO PUMAR ALVES DE SOUZA - 1221007
+
+LABORATORIO 7
+FIFO
+
+QUESTAO: 1)Abra duas seções de terminais 
+Na primeira, execute um programa que fica em 
+loop lendo de uma FIFO para depois escrever na 
+saída padrão (tela) 
+Na segunda, execute um programa que fica lendo 
+da entrada padrão (teclado) e depois escreve na 
+mesma FIFO 
+-----------------------------------------------------
+ex1-read.c
+#include <stdio.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <fcntl.h>
+#include <string.h>
+#define FIFO "minhaFifo"
+
+int main() {
+	int fifo;
+	char ch;
+
+	if (access (FIFO, F_OK) == -1) {
+		if (mkfifo (FIFO, S_IRUSR | S_IWUSR) != 0) {
+			fprintf (stderr, "Erro ao criar FIFO %s\n", FIFO);
+			return -1;
+		}
+	}
+  	printf ("\nAbrindo FIFO\n");
+	if ((fifo = open (FIFO, O_RDONLY)) < 0) {
+		fprintf (stderr, "Erro ao abrir a FIFO %s\n", FIFO);
+		return -2;
+	}
+	printf ("\nSou o reader - espere a escrita\n");
+	while (read (fifo, &ch, sizeof (ch)) > 0) {
+		putchar (ch);
+	}
+
+	puts ("fim leitura");
+
+	close (fifo);
+
+	return 0;
+}
+-----------------------------------------------------
+ex1-write.c
+#include <stdio.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <fcntl.h>
+#include <string.h>
+#define FIFO "minhaFifo"
+
+int main() {
+	int fifo;
+	char ch;
+
+	if (access (FIFO, F_OK) == -1) {
+		if (mkfifo (FIFO, S_IRUSR | S_IWUSR) != 0) {
+			fprintf (stderr, "Erro ao criar FIFO %s\n", FIFO);
+			return -1;
+		}
+	}
+  	printf ("\nAbrindo FIFO\n");
+	if ((fifo = open ("minhaFifo", O_WRONLY)) < 0) {
+		  fprintf (stderr, "Erro ao abrir a FIFO %s\n", FIFO);
+		  return -2;
+	}
+
+	printf ("\nSou o writer -  digite no teclado - Digite 0 para parar\n");
+	while (ch != '0') {
+		scanf ("%c", &ch);
+		write (fifo, &ch, 1);
+	}
+
+	close (fifo);
+
+	return 0;
+}
+
+-----------------------------------------------------
+COMPILACAO E EXECUCAO
+terminal1
+$ gcc -o ex1-read ex1-read.c
+$ gcc -o ex1-write ex1-write.c
+$./ex1-read
+terminal 2
+$./ex1-write
+-----------------------------------------------------
+RESULTADO
+terminal 1:
+
+Abrindo FIFO
+
+Sou o reader - espere a escrita
+a
+b
+c
+d
+e
+rodrigo
+teste
+f
+g
+0fim leitura
+
+terminal 2:
+Abrindo FIFO
+
+Sou o writer -  digite no teclado - Digite 0 para parar
+a
+b
+c
+d
+e
+rodrigo
+teste
+f   
+g
+0
+
+
+-----------------------------------------------------
+CONCLUSAO
+A escrita e leitura da FIFO são bloqueantes.
+O leitor da FIFO fica em loop exibindo na tela sempre que algo novo é escrito na FIFO.
+O escritor da FIFO também fica em loop  lendo do teclado os caracteres e escrevendo-os na FIFO.
+Enquanto as duas janelas do terminal visualisamos isso. Para finalizar pode-se digitar o caractere 0, fechando a FIFO e terminando os programas.
+
+-----------------------------------------------------
+QUESTAO: 2) Escreva um programa que primeiro cria uma FIFO e em seguida cria dois processos filho que escrevem uma string na FIFO.
+O pai dá um waitpid em seguida lê as strings desse FIFO e exibe na tela
+
+-----------------------------------------------------
+ex2.c
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <fcntl.h>
+#include <unistd.h>
+#define FIFO "minhaFifo"
+
+int main (void) { 
+	int fifo,pid1,pid2;
+	if (access (FIFO, F_OK) == -1) {
+		if (mkfifo (FIFO, S_IRUSR | S_IWUSR) != 0) {
+			fprintf (stderr, "Erro ao criar FIFO %s\n", FIFO);
+			return -1;
+		}
+	}
+
+	if((pid1 = fork()) == 0) { //FILHO 1
+
+		char str[50] = "Este eh o primeiro filho";
+		if ((fifo = open(FIFO, O_WRONLY)) < 0) { 
+			puts ("Erro ao abrir a FIFO para escrita"); 
+			return -1; 
+		} 
+		printf("Escrita primeira mensagem na FIFO\n");
+		write(fifo, str, sizeof(str));
+		close(fifo);
+	}
+	else {		//FILHO 2
+		if((pid2 = fork()) == 0) {
+			char str[50] = "Este eh o segundo filho";
+			if ((fifo = open(FIFO, O_WRONLY)) < 0) { 
+				puts ("Erro ao abrir a FIFO para escrita"); 
+				return -1; 
+			} 
+
+			printf("Escrita segunda mensagem na FIFO\n");
+			write(fifo, str, sizeof(str));
+			close(fifo);
+		}
+		else{ 	//PAI
+			char str[50];
+
+			if ((fifo = open(FIFO, O_RDONLY)) < 0) { 
+				puts ("Erro ao abrir a FIFO para escrita"); 
+				return -1; 
+			}
+			waitpid(-1,NULL,0);
+			waitpid(-1,NULL,0);
+
+
+			while (read(fifo, str, sizeof(str)) > 0 ){
+				printf("Li da fifo: %s\n",str);
+			}
+			close(fifo);
+		}
+	}
+
+	return 0;
+} 
+-----------------------------------------------------
+COMPILACAO E EXECUCAO
+$ gcc -o ex2 ex2.c
+$ ./ex2
+-----------------------------------------------------
+RESULTADO
+Escrita primeira mensagem na FIFO
+Escrita segunda mensagem na FIFO
+Li da fifo: Este eh o primeiro filho
+Li da fifo: Este eh o segundo filho
+
+-----------------------------------------------------
+CONCLUSAO
+Criamos dos filhos que escrevem na fifo mensagem diferentes. Por meio de waitpid no pai, temos que o pai imprimira somente apos os filhos terem escrito.
+Ele imprimira na ordem de criacao dos filhos as duas mensagens no fifo.
+
+-----------------------------------------------------
+QUESTAO: 3)Escreva um servidor e um cliente usando duas
+FIFOs: uma para enviar strings para o servidor,
+e outra para transmitir as respostas de volta
+para os clientes. O servidor deverá rodar em
+background e transformar cada palavra
+recebida de minusculas para maiúsculas. 
+obs: execute os clientes em terminais diferentes
+
+-----------------------------------------------------
+server.c
+#include <stdio.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <string.h>
+#include <stdlib.h>
+#include <sys/wait.h>
+#include <ctype.h>
+
+
+
+int main(void)
+{
+	int fpFIFOup, fpFIFOdown;
+	char ch;
+	//fifo de upload server(leitura)
+	if(access("fifoUp", F_OK) == -1)
+	{
+		if(mkfifo("fifoUp", S_IRUSR | S_IWUSR) != 0)
+		{
+			printf("Erro ao criar fifo UP\n");
+			return -1;
+		}
+	}
+	
+	if((fpFIFOup = open("fifoUp", O_RDONLY)) < 0)
+	{
+		printf("erro ao abrir fifo DOWN\n");
+		return -2;
+	}
+	
+	//fifo de download do server(escrita)
+	if(access("fifoDown", F_OK) == -1)
+	{
+		printf("criando fifo down\n");
+		if(mkfifo("fifoDown", S_IRUSR | S_IWUSR) != 0)
+		{
+			printf("Erro ao criar fifo\n");
+			return -1;
+		}
+	}
+	
+	if((fpFIFOdown = open("fifoDown", O_WRONLY)) < 0)
+	{
+		printf("erro ao abrir fifo\n");
+		return -2;
+	}
+	
+	//transforma de minuscula para maiuscula
+	while(read(fpFIFOup, &ch, 1) > 0)
+	{
+		ch = toupper(ch);
+		write(fpFIFOdown, &ch, 1);
+	}	
+
+	return 0;
+}
+-----------------------------------------------------
+client.c
+#include <stdio.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <string.h>
+#include <stdlib.h>
+#include <sys/wait.h>
+
+
+
+int main(void)
+{
+	int fpFIFOup, fpFIFOdown;
+	char ch;
+	//fifo de upload ao server(escrita)
+	if(access("fifoUp", F_OK) == 0)
+	{
+		if((fpFIFOup = open("fifoUp", O_WRONLY)) < 0)
+		{
+			printf("erro ao abrir fifo\n");
+			return -2;
+		}
+	}
+	
+	//fifo de download do server(leitura)
+	if(access("fifoUp", F_OK) == 0)
+	{
+		if((fpFIFOdown = open("fifoDown", O_RDONLY)) < 0)
+		{
+			printf("erro ao abrir fifo\n");
+			return -2;
+		}
+	}
+
+	//fifo de download do server(leitura)
+
+	printf ("\nVoce esta sendo input - Digite 0 ser output\n");
+	while (ch != '0') {
+		scanf ("%c", &ch);
+		write (fpFIFOup, &ch, 1);
+	}
+	printf ("\nVoce esta escrevendo\n");
+	while (read (fpFIFOdown, &ch, sizeof (ch)) > 0) {
+		putchar (ch);
+	}	
+	return 0;
+}
+
+-----------------------------------------------------
+COMPILACAO E EXECUCAO
+Terminal 1
+$ gcc -o server server.c
+$ ./server
+
+Terminal 2
+$ gcc -o client1 client.c
+$ ./client1
+
+Terminal 3
+$ gcc -o client2 client.c
+$ ./client2
+-----------------------------------------------------
+RESULTADO
+Terminal 2
+Voce esta sendo input - Digite 0 ser output
+rodrigo pumar
+testando
+MmMmM
+esta funcionando como pode ver
+
+Terminal 3
+Voce esta sendo input - Digite 0 ser output
+0
+
+Voce esta escrevendo
+0RODRIGO PUMAR
+TESTANDO
+MMMMM
+ESTA FUNCIONANDO COMO PODE VER
+
+-----------------------------------------------------
+CONCLUSAO
+O programa server fica executando em background no terminal 1, criando dois fifo, um de upload e outro de download.
+
+Criamos dos programas client, sendo que um em um momento estara escrevendo na fifo de upload e outro estara recebendo na Fifo de download o mesmo caracteres transformados em maiuscula pelo programa server.
+
